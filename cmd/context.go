@@ -1,0 +1,44 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+)
+
+func main() {
+	gen := func(ctx context.Context) <-chan int {
+		dst := make(chan int)
+		n := 1
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case dst <- n:
+					n++
+				}
+			}
+		}()
+		return dst
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	for n := range gen(ctx) {
+		fmt.Println(n)
+		if n == 5 {
+			break
+		}
+	}
+
+	d := time.Now().Add(50 * time.Millisecond)
+	ctx2, cancel2 := context.WithDeadline(context.Background(), d)
+	defer cancel2()
+	select {
+	case <-time.After(time.Second):
+		fmt.Println("1 s")
+	case <-ctx2.Done():
+		fmt.Println(ctx2.Err())
+	}
+}
